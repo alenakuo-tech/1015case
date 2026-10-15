@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式動態長條圖分析工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        .focus-visible-ring:focus-visible {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    互動式數據長條圖分析工具
+                </h1>
+                <p class="text-sm text-slate-600 mt-1">支援各學年度與各科系證照統計資料，可自訂標題、單位與資料列，即時產生具備無障礙導覽的長條圖。</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <button id="load-sample-btn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-lg transition border border-slate-300 focus-visible-ring">預設綜合範例</button>
+                <button id="load-dataset-1" class="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium text-sm rounded-lg transition border border-blue-200 focus-visible-ring">112學年度各科總計</button>
+                <button id="load-dataset-2" class="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium text-sm rounded-lg transition border border-blue-200 focus-visible-ring">113學年度各科總計</button>
+                <button id="load-dataset-3" class="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium text-sm rounded-lg transition border border-blue-200 focus-visible-ring">114學年度各科總計</button>
+                <button id="clear-all-btn" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium text-sm rounded-lg transition border border-rose-200 focus-visible-ring">清除全部</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- 左側：圖表設定與資料輸入介面 -->
+        <section class="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-6">
+            <h2 class="text-lg font-semibold text-slate-800 border-b pb-3 flex items-center gap-2">
+                <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                圖表設定與資料管理
+            </h2>
+
+            <!-- 錯誤與警告提示訊息框 -->
+            <div id="error-alert" class="hidden bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl text-sm flex items-start gap-3" role="alert">
+                <svg class="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <div id="error-message-text" class="flex-grow">錯誤提示內容</div>
+            </div>
+
+            <!-- 學年度與科系快速載入分類工具列 -->
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                <span class="text-xs font-bold text-slate-700 uppercase tracking-wider block">學年度與科系快速載入</span>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" onclick="loadSubDataset('y112')" class="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-medium rounded border border-slate-300 transition">112學年度各科</button>
+                    <button type="button" onclick="loadSubDataset('y113')" class="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-medium rounded border border-slate-300 transition">113學年度各科</button>
+                    <button type="button" onclick="loadSubDataset('y114')" class="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-medium rounded border border-slate-300 transition">114學年度各科</button>
+                    <button type="button" onclick="loadSubDataset('nursing')" class="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-medium rounded border border-slate-300 transition">護理科跨年比較</button>
+                    <button type="button" onclick="loadSubDataset('child')" class="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-medium rounded border border-slate-300 transition">幼保科跨年比較</button>
+                </div>
+            </div>
+
+            <!-- 圖表全域設定表單 -->
+            <div class="space-y-4">
+                <div>
+                    <label for="chart-title-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">圖表標題</label>
+                    <input type="text" id="chart-title-input" value="112學年度各科系證照總計統計" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus-visible-ring" placeholder="例：第一季營收統計">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="chart-unit-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">數值單位</label>
+                        <input type="text" id="chart-unit-input" value="張" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus-visible-ring" placeholder="例：新台幣千元 / 張">
+                    </div>
+                    <div>
+                        <label for="chart-period-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">期間欄</label>
+                        <input type="text" id="chart-period-input" value="112 學年度" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus-visible-ring" placeholder="例：2026年Q1">
+                    </div>
+                </div>
+                <div>
+                    <label for="chart-source-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">資料來源</label>
+                    <input type="text" id="chart-source-input" value="教務處證照統計報表" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus-visible-ring" placeholder="例：內部財務報表">
+                </div>
+            </div>
+
+            <!-- 新增資料列表單 -->
+            <div class="border-t border-slate-200 pt-5">
+                <h3 class="text-sm font-semibold text-slate-800 mb-3">新增分類數值</h3>
+                <form id="add-item-form" class="space-y-3">
+                    <div>
+                        <label for="new-name-input" class="block text-xs font-medium text-slate-600 mb-1">分類名稱</label>
+                        <input type="text" id="new-name-input" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus-visible-ring" placeholder="例：幼保科">
+                    </div>
+                    <div>
+                        <label for="new-value-input" class="block text-xs font-medium text-slate-600 mb-1">數值 (非負有限數)</label>
+                        <input type="number" step="any" min="0" id="new-value-input" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus-visible-ring" placeholder="例：695">
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm transition shadow-sm focus-visible-ring flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        新增資料列
+                    </button>
+                </form>
+            </div>
+
+            <!-- 現有資料列表與編輯區 -->
+            <div class="border-t border-slate-200 pt-5 flex-grow flex flex-col">
+                <h3 class="text-sm font-semibold text-slate-800 mb-3 flex justify-between items-center">
+                    <span>現有資料清單</span>
+                    <span id="item-count-badge" class="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-medium">0 筆</span>
+                </h3>
+                <div id="items-list-container" class="space-y-2 max-h-64 overflow-y-auto pr-1 flex-grow">
+                    <!-- 動態渲染資料列項目 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 右側：視覺化長條圖與文字摘要展示區 -->
+        <section class="lg:col-span-7 flex flex-col gap-6">
+            
+            <!-- 圖表畫布容器 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-4 border-b border-slate-100 gap-2">
+                    <div>
+                        <h2 id="display-title" class="text-xl font-bold text-slate-900">載入中...</h2>
+                        <p id="display-subtitle" class="text-xs text-slate-500 mt-1">期間：<span id="display-period">-</span> | 單位：<span id="display-unit">-</span></p>
+                    </div>
+                    <span id="display-source" class="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-200">來源：-</span>
+                </div>
+
+                <!-- SVG 長條圖呈現區 -->
+                <div id="chart-container" class="w-full relative overflow-x-auto min-h-[360px] flex items-center justify-center">
+                    <!-- 動態生成 SVG -->
+                </div>
+
+                <!-- 長條詳細檢視卡片 (點擊或鍵盤聚焦時顯示詳細說明) -->
+                <div id="detail-card" class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">詳細數值檢視</span>
+                            <h4 id="detail-name" class="text-base font-bold text-slate-900 mt-0.5">-</h4>
+                        </div>
+                        <button id="close-detail-btn" class="text-slate-400 hover:text-slate-600 text-sm font-bold px-2 py-0.5">&times;</button>
+                    </div>
+                    <div class="mt-2 flex items-baseline gap-2">
+                        <span class="text-2xl font-extrabold text-blue-700" id="detail-val">-</span>
+                        <span class="text-sm text-slate-600" id="detail-unit-label">-</span>
+                    </div>
+                    <p class="text-xs text-slate-600 mt-1" id="detail-percentage">-</p>
+                </div>
+            </div>
+
+            <!-- 圖表文字摘要區 (客觀計算最高、最低、同值項) -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h3 class="text-lg font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    圖表客觀文字摘要
+                </h3>
+                <div id="chart-summary-text" class="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <!-- 動態填入摘要 -->
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <footer class="mt-auto bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        <p>互動式長條圖分析工具 &copy; 2026 | 支援完全響應式、鍵盤焦點導覽與無障礙網頁設計</p>
+    </footer>
+
+    <script>
+        let state = {
+            title: "112學年度各科系證照總計統計",
+            unit: "張",
+            period: "112學年度",
+            source: "教務處證照統計報表",
+            items: [
+                { id: "1", name: "幼保科", value: 695 },
+                { id: "2", name: "生關科", value: 62 },
+                { id: "3", name: "妝管科", value: 419 },
+                { id: "4", name: "智照科", value: 104 },
+                { id: "5", name: "智醫科", value: 104 },
+                { id: "6", name: "視光科", value: 271 },
+                { id: "7", name: "餐飲科", value: 280 },
+                { id: "8", name: "應外科", value: 3 },
+                { id: "9", name: "護理科", value: 795 }
+            ]
+        };
+
+        // 豐富的學年度與科系測試範例資料集
+        const sampleDatasets = {
+            default: {
+                title: "112學年度各科系證照取得總計",
+                unit: "張",
+                period: "112學年度",
+                source: "教務處證照統計報表",
+                items: [
+                    { id: "1", name: "幼保科", value: 695 },
+                    { id: "2", name: "生關科", value: 62 },
+                    { id: "3", name: "妝管科", value: 419 },
+                    { id: "4", name: "智照科", value: 104 },
+                    { id: "5", name: "智醫科", value: 104 },
+                    { id: "6", name: "視光科", value: 271 },
+                    { id: "7", name: "餐飲科", value: 280 },
+                    { id: "8", name: "應外科", value: 3 },
+                    { id: "9", name: "護理科", value: 795 }
+                ]
+            },
+            dataset1: {
+                title: "112學年度各科系證照總計",
+                unit: "張",
+                period: "112學年度",
+                source: "教務處統計表",
+                items: [
+                    { id: "d1-1", name: "幼保科", value: 695 },
+                    { id: "d1-2", name: "生關科", value: 62 },
+                    { id: "d1-3", name: "妝管科", value: 419 },
+                    { id: "d1-4", name: "智照科", value: 104 },
+                    { id: "d1-5", name: "智醫科", value: 104 },
+                    { id: "d1-6", name: "視光科", value: 271 },
+                    { id: "d1-7", name: "餐飲科", value: 280 },
+                    { id: "d1-8", name: "應外科", value: 3 },
+                    { id: "d1-9", name: "護理科", value: 795 }
+                ]
+            },
+            dataset2: {
+                title: "113學年度各科系證照總計",
+                unit: "張",
+                period: "113學年度",
+                source: "教務處統計表",
+                items: [
+                    { id: "d2-1", name: "幼保科", value: 99 },
+                    { id: "d2-2", name: "生關科", value: 51 },
+                    { id: "d2-3", name: "妝管科", value: 262 },
+                    { id: "d2-4", name: "智照科", value: 71 },
+                    { id: "d2-5", name: "智醫科", value: 78 },
+                    { id: "d2-6", name: "視光科", value: 283 },
+                    { id: "d2-7", name: "餐飲科", value: 288 },
+                    { id: "d2-8", name: "護理科", value: 584 }
+                ]
+            },
+            dataset3: {
+                title: "114學年度各科系證照總計",
+                unit: "張",
+                period: "114學年度",
+                source: "教務處統計表",
+                items: [
+                    { id: "d3-1", name: "幼保科", value: 397 },
+                    { id: "d3-2", name: "生關科", value: 51 },
+                    { id: "d3-3", name: "妝管科", value: 266 },
+                    { id: "d3-4", name: "智照科", value: 111 },
+                    { id: "d3-5", name: "智醫科", value: 143 },
+                    { id: "d3-6", name: "視光科", value: 199 },
+                    { id: "d3-7", name: "餐飲科", value: 277 },
+                    { id: "d3-8", name: "護理科", value: 1039 }
+                ]
+            },
+            nursing: {
+                title: "護理科跨學年度證照數比較",
+                unit: "張",
+                period: "112-114學年度",
+                source: "教務處統計表",
+                items: [
+                    { id: "n-112", name: "112學年度護理", value: 795 },
+                    { id: "n-113", name: "113學年度護理", value: 584 },
+                    { id: "n-114", name: "114學年度護理", value: 1039 }
+                ]
+            },
+            child: {
+                title: "幼保科跨學年度證照數比較",
+                unit: "張",
+                period: "112-114學年度",
+                source: "教務處統計表",
+                items: [
+                    { id: "c-112", name: "112學年度幼保", value: 695 },
+                    { id: "c-113", name: "113學年度幼保", value: 99 },
+                    { id: "c-114", name: "114學年度幼保", value: 397 }
+                ]
+            }
+        };
+
+        // DOM 元素快取
+        const chartTitleInput = document.getElementById('chart-title-input');
+        const chartUnitInput = document.getElementById('chart-unit-input');
+        const chartPeriodInput = document.getElementById('chart-period-input');
+        const chartSourceInput = document.getElementById('chart-source-input');
+        
+        const addItemForm = document.getElementById('add-item-form');
+        const newNameInput = document.getElementById('new-name-input');
+        const newValueInput = document.getElementById('new-value-input');
+        const itemsListContainer = document.getElementById('items-list-container');
+        const itemCountBadge = document.getElementById('item-count-badge');
+        
+        const errorAlert = document.getElementById('error-alert');
+        const errorMessageText = document.getElementById('error-message-text');
+
+        const displayTitle = document.getElementById('display-title');
+        const displaySubtitle = document.getElementById('display-subtitle');
+        const displayPeriod = document.getElementById('display-period');
+        const displayUnit = document.getElementById('display-unit');
+        const displaySource = document.getElementById('display-source');
+        const chartContainer = document.getElementById('chart-container');
+        
+        const detailCard = document.getElementById('detail-card');
+        const detailName = document.getElementById('detail-name');
+        const detailVal = document.getElementById('detail-val');
+        const detailUnitLabel = document.getElementById('detail-unit-label');
+        const detailPercentage = document.getElementById('detail-percentage');
+        const closeDetailBtn = document.getElementById('close-detail-btn');
+        
+        const chartSummaryText = document.getElementById('chart-summary-text');
+        const loadSampleBtn = document.getElementById('load-sample-btn');
+        const loadDataset1Btn = document.getElementById('load-dataset-1');
+        const loadDataset2Btn = document.getElementById('load-dataset-2');
+        const loadDataset3Btn = document.getElementById('load-dataset-3');
+        const clearAllBtn = document.getElementById('clear-all-btn');
+
+        // 顯示錯誤訊息提示
+        function showError(msg) {
+            errorMessageText.textContent = msg;
+            errorAlert.classList.remove('hidden');
+            setTimeout(() => {
+                errorAlert.classList.add('hidden');
+            }, 6000);
+        }
+
+        // 隱藏錯誤訊息
+        function hideError() {
+            errorAlert.classList.add('hidden');
+        }
+
+        // 初始化與事件綁定
+        function initApp() {
+            chartTitleInput.addEventListener('input', (e) => {
+                state.title = e.target.value.trim() || '未命名圖表';
+                render();
+            });
+            chartUnitInput.addEventListener('input', (e) => {
+                state.unit = e.target.value.trim() || '';
+                render();
+            });
+            chartPeriodInput.addEventListener('input', (e) => {
+                state.period = e.target.value.trim() || '';
+                render();
+            });
+            chartSourceInput.addEventListener('input', (e) => {
+                state.source = e.target.value.trim() || '';
+                render();
+            });
+
+            addItemForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                hideError();
+
+                const name = newNameInput.value.trim();
+                const rawValue = newValueInput.value;
+
+                if (!name) {
+                    showError('分類名稱不得為空白。');
+                    newNameInput.focus();
+                    return;
+                }
+
+                const isDuplicate = state.items.some(item => item.name === name);
+                if (isDuplicate) {
+                    showError(`分類名稱「${name}」已存在，請勿輸入重複名稱。`);
+                    newNameInput.focus();
+                    return;
+                }
+
+                if (rawValue === '' || isNaN(rawValue)) {
+                    showError('數值不可為空白且必須為有效數字。');
+                    newValueInput.focus();
+                    return;
+                }
+
+                const value = Number(rawValue);
+
+                if (!Number.isFinite(value) || value < 0) {
+                    showError('數值必須為非負有限數 (大於或等於 0)。');
+                    newValueInput.focus();
+                    return;
+                }
+
+                state.items.push({
+                    id: Date.now().toString(),
+                    name: name,
+                    value: value
+                });
+
+                newNameInput.value = '';
+                newValueInput.value = '';
+                newNameInput.focus();
+
+                render();
+            });
+
+            loadSampleBtn.addEventListener('click', () => loadDataset('default'));
+            loadDataset1Btn.addEventListener('click', () => loadDataset('dataset1'));
+            loadDataset2Btn.addEventListener('click', () => loadDataset('dataset2'));
+            loadDataset3Btn.addEventListener('click', () => loadDataset('dataset3'));
+
+            clearAllBtn.addEventListener('click', () => {
+                state.items = [];
+                hideError();
+                render();
+            });
+
+            closeDetailBtn.addEventListener('click', () => {
+                detailCard.classList.add('hidden');
+            });
+
+            syncInputsFromState();
+            render();
+        }
+
+        window.loadSubDataset = function(key) {
+            loadDataset(key);
+        };
+
+        function loadDataset(key) {
+            hideError();
+            const ds = sampleDatasets[key];
+            if (!ds) return;
+            state = {
+                title: ds.title,
+                unit: ds.unit,
+                period: ds.period,
+                source: ds.source,
+                items: ds.items.map(item => ({ ...item }))
+            };
+            syncInputsFromState();
+            render();
+        }
+
+        function syncInputsFromState() {
+            chartTitleInput.value = state.title;
+            chartUnitInput.value = state.unit;
+            chartPeriodInput.value = state.period;
+            chartSourceInput.value = state.source;
+        }
+
+        window.deleteItem = function(id) {
+            hideError();
+            state.items = state.items.filter(item => item.id !== id);
+            render();
+        };
+
+        window.updateItemField = function(id, field, val) {
+            const item = state.items.find(i => i.id === id);
+            if (!item) return;
+
+            if (field === 'name') {
+                const trimmed = val.trim();
+                if (!trimmed) {
+                    showError('分類名稱不得為空白。');
+                    render();
+                    return;
+                }
+                const duplicate = state.items.some(i => i.id !== id && i.name === trimmed);
+                if (duplicate) {
+                    showError(`分類名稱「${trimmed}」已存在。`);
+                    render();
+                    return;
+                }
+                item.name = trimmed;
+            } else if (field === 'value') {
+                if (val === '' || isNaN(val)) {
+                    showError('數值必須為有效數字。');
+                    render();
+                    return;
+                }
+                const num = Number(val);
+                if (!Number.isFinite(num) || num < 0) {
+                    showError('數值必須為非負有限數。');
+                    render();
+                    return;
+                }
+                item.value = num;
+            }
+            hideError();
+            render();
+        };
+
+        function showDetailCard(item, totalSum) {
+            detailName.textContent = item.name;
+            detailVal.textContent = item.value.toLocaleString();
+            detailUnitLabel.textContent = state.unit;
+            const pct = totalSum > 0 ? ((item.value / totalSum) * 100).toFixed(1) : 0;
+            detailPercentage.textContent = `占總數之 ${pct}%（總數：${totalSum.toLocaleString()} ${state.unit}）`;
+            detailCard.classList.remove('hidden');
+        }
+
+        function render() {
+            displayTitle.textContent = state.title || '未命名圖表';
+            displayPeriod.textContent = state.period || '無';
+            displayUnit.textContent = state.unit || '無';
+            displaySource.textContent = `來源：${state.source || '未註明'}`;
+            itemCountBadge.textContent = `${state.items.length} 筆`;
+
+            renderItemsList();
+            renderSvgChart();
+            renderSummary();
+        }
+
+        function renderItemsList() {
+            if (state.items.length === 0) {
+                itemsListContainer.innerHTML = `
+                    <div class="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-xl">
+                        目前無資料，請於上方新增或載入範例。
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            state.items.forEach((item, index) => {
+                html += `
+                    <div class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 transition">
+                        <span class="text-xs font-semibold text-slate-400 w-6 text-center">${index + 1}</span>
+                        <input type="text" value="${escapeHtml(item.name)}" 
+                            onchange="updateItemField('${item.id}', 'name', this.value)"
+                            class="flex-grow px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus-visible-ring" 
+                            title="修改分類名稱">
+                        <input type="number" step="any" min="0" value="${item.value}" 
+                            onchange="updateItemField('${item.id}', 'value', this.value)"
+                            class="w-24 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus-visible-ring" 
+                            title="修改數值">
+                        <button onclick="deleteItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition focus-visible-ring" title="刪除此列">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+                `;
+            });
+            itemsListContainer.innerHTML = html;
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function renderSvgChart() {
+            if (state.items.length === 0) {
+                chartContainer.innerHTML = `
+                    <div class="h-64 flex flex-col items-center justify-center text-slate-400 text-sm">
+                        <svg class="w-12 h-12 mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                        尚無資料可供繪製圖表，請新增資料。
+                    </div>
+                `;
+                return;
+            }
+
+            const itemCount = state.items.length;
+            const minWidth = Math.max(650, itemCount * 75);
+            const height = 400;
+            const margin = { top: 50, right: 30, bottom: 60, left: 70 };
+            const chartWidth = minWidth - margin.left - margin.right;
+            const chartHeight = height - margin.top - margin.bottom;
+
+            const values = state.items.map(d => d.value);
+            const maxVal = Math.max(...values, 10);
+            
+            let topScale = niceNumber(maxVal);
+            if (topScale < maxVal) topScale = maxVal * 1.1;
+
+            const totalSum = values.reduce((a, b) => a + b, 0);
+
+            let svgContent = `
+                <svg viewBox="0 0 ${minWidth} ${height}" class="w-full h-auto overflow-visible select-none" aria-label="資料長條圖">
+                    <defs>
+                        <linearGradient id="barGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#3b82f6" />
+                            <stop offset="100%" stop-color="#1d4ed8" />
+                        </linearGradient>
+                    </defs>
+            `;
+
+            const gridCount = 5;
+            for (let i = 0; i <= gridCount; i++) {
+                const val = (topScale / gridCount) * i;
+                const yPos = margin.top + chartHeight - (chartHeight / gridCount) * i;
+                
+                svgContent += `
+                    <line x1="${margin.left}" y1="${yPos}" x2="${margin.left + chartWidth}" y2="${yPos}" stroke="#e2e8f0" stroke-dasharray="${i === 0 ? '0' : '4,4'}" stroke-width="${i === 0 ? '2' : '1'}" />
+                    <text x="${margin.left - 12}" y="${yPos + 4}" text-anchor="end" font-size="12" fill="#64748b" font-weight="500">${formatNumber(val)}</text>
+                `;
+            }
+
+            svgContent += `
+                <text x="${margin.left - 45}" y="${margin.top - 20}" font-size="12" fill="#475569" font-weight="600">單位: ${state.unit}</text>
+            `;
+
+            const barWidth = Math.min(45, (chartWidth / itemCount) * 0.7);
+            const gap = (chartWidth - (barWidth * itemCount)) / (itemCount + 1);
+
+            state.items.forEach((item, index) => {
+                const xPos = margin.left + gap + index * (barWidth + gap);
+                const barH = (item.value / topScale) * chartHeight;
+                const yPos = margin.top + chartHeight - barH;
+
+                svgContent += `
+                    <g class="cursor-pointer group" tabindex="0" role="button" aria-label="${item.name}: ${item.value} ${state.unit}"
+                       onclick='handleBarClick(${JSON.stringify(item)}, ${totalSum})'
+                       onkeydown='if(event.key==="Enter" || event.key===" "){handleBarClick(${JSON.stringify(item)}, ${totalSum}); event.preventDefault();}'
+                    >
+                        <rect x="${xPos - gap/2}" y="${margin.top}" width="${barWidth + gap}" height="${chartHeight}" fill="transparent" />
+                        <rect x="${xPos}" y="${yPos}" width="${barWidth}" height="${Math.max(barH, 2)}" rx="6" ry="6" 
+                              fill="url(#barGradient)" class="transition-all duration-200 group-hover:opacity-90 group-focus:stroke-amber-400 group-focus:stroke-2" />
+                        <text x="${xPos + barWidth / 2}" y="${yPos - 8}" text-anchor="middle" font-size="12" font-weight="700" fill="#1e293b">
+                            ${item.value.toLocaleString()}
+                        </text>
+                        <text x="${xPos + barWidth / 2}" y="${margin.top + chartHeight + 22}" text-anchor="middle" font-size="12" font-weight="600" fill="#475569">
+                            ${truncateText(item.name, 9)}
+                        </text>
+                    </g>
+                `;
+            });
+
+            svgContent += `</svg>`;
+            chartContainer.innerHTML = svgContent;
+        }
+
+        window.handleBarClick = function(item, totalSum) {
+            showDetailCard(item, totalSum);
+        };
+
+        function niceNumber(max) {
+            if (max <= 0) return 10;
+            const exponent = Math.floor(Math.log10(max));
+            const fraction = max / Math.pow(10, exponent);
+            let niceFraction;
+
+            if (fraction <= 1) niceFraction = 1;
+            else if (fraction <= 2) niceFraction = 2;
+            else if (fraction <= 5) niceFraction = 5;
+            else niceFraction = 10;
+
+            return niceFraction * Math.pow(10, exponent);
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(num % 1000 === 0 ? 0 : 1) + 'k';
+            return num.toLocaleString();
+        }
+
+        function truncateText(str, maxLen) {
+            if (str.length <= maxLen) return str;
+            return str.substring(0, maxLen) + '…';
+        }
+
+        function renderSummary() {
+            if (state.items.length === 0) {
+                chartSummaryText.innerHTML = "目前無任何資料可供摘要。";
+                return;
+            }
+
+            const totalCount = state.items.length;
+            const totalSum = state.items.reduce((sum, item) => sum + item.value, 0);
+            const average = (totalSum / totalCount).toFixed(1);
+
+            let maxVal = state.items[0].value;
+            let minVal = state.items[0].value;
+
+            state.items.forEach(item => {
+                if (item.value > maxVal) maxVal = item.value;
+                if (item.value < minVal) minVal = item.value;
+            });
+
+            const maxItems = state.items.filter(item => item.value === maxVal);
+            const minItems = state.items.filter(item => item.value === minVal);
+
+            const valueMap = {};
+            state.items.forEach(item => {
+                valueMap[item.value] = (valueMap[item.value] || 0) + 1;
+            });
+            const duplicateGroups = Object.entries(valueMap).filter(([val, count]) => count > 1);
+
+            let summaryHtml = `
+                本圖表期間為 <strong class="text-slate-900">${escapeHtml(state.period)}</strong>，共包含 <strong class="text-slate-900">${totalCount}</strong> 個分類項目，總計數值為 <strong class="text-slate-900">${totalSum.toLocaleString()} ${escapeHtml(state.unit)}</strong>，平均數值為 <strong class="text-slate-900">${Number(average).toLocaleString()} ${escapeHtml(state.unit)}</strong>。<br><br>
+                
+                <strong>【極值分析】</strong><br>
+                - 最高數值為 <strong class="text-blue-600">${maxVal.toLocaleString()} ${escapeHtml(state.unit)}</strong>，對應分類包含：<span class="font-semibold text-slate-800">${maxItems.map(i => escapeHtml(i.name)).join('、')}</span>。<br>
+                - 最低數值為 <strong class="text-slate-700">${minVal.toLocaleString()} ${escapeHtml(state.unit)}</strong>，對應分類包含：<span class="font-semibold text-slate-800">${minItems.map(i => escapeHtml(i.name)).join('、')}</span>。<br>
+            `;
+
+            if (duplicateGroups.length > 0) {
+                summaryHtml += `<br><strong>【同值項目】</strong><br>`;
+                duplicateGroups.forEach(([val, count]) => {
+                    const matchingNames = state.items.filter(i => i.value === Number(val)).map(i => escapeHtml(i.name));
+                    summaryHtml += `- 數值 <strong class="text-slate-800">${Number(val).toLocaleString()} ${escapeHtml(state.unit)}</strong> 共有 ${count} 項：<span class="font-medium text-slate-700">${matchingNames.join('、')}</span>。<br>`;
+                });
+            }
+
+            chartSummaryText.innerHTML = summaryHtml;
+        }
+
+        window.onload = function() {
+            initApp();
+        };
+    </script>
+</body>
+</html>
